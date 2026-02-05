@@ -1,2 +1,10 @@
-dicom_files/
-myvenv/
+venv/
+__pycache__/
+*.pyd
+*.dll
+*.so
+*.html
+*.dcm
+*.vtk
+*.obj
+*.stl
