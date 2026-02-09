@@ -134,13 +134,13 @@ class FacialLandmarkPicker:
         print("\nInstructions:")
         print("  1. Rotate the model to get a good view")
         print("  2. Press a key to select landmark type:")
-        print("     'r' - Right Eye")
-        print("     'l' - Left Eye")
-        print("     'n' - Nose Tip")
-        print("     'c' - Chin")
-        print("     'e' - Right Ear")
-        print("     'a' - Left Ear")
-        print("     'o' - Other (custom)")
+        print("     '1' - Right Eye")
+        print("     '2' - Left Eye")
+        print("     '3' - Nose Tip")
+        print("     '4' - Chin")
+        print("     '5' - Right Ear")
+        print("     '6' - Left Ear")
+        print("     '0' - Other (custom)")
         print("  3. Click on the mesh to pick the point")
         print("  4. Press 'u' to undo last point")
         print("  5. Press 's' to save landmarks")
@@ -205,7 +205,7 @@ class FacialLandmarkPicker:
         
         def picking_callback(point):
             if self.current_landmark_type is None:
-                print("\nPlease select a landmark type first (press r/l/n/c/e/a/o)")
+                print("\nPlease select a landmark type first (press 1/2/3/4/5/6/0)")
                 return
             
             # Add point to landmarks
@@ -232,13 +232,13 @@ class FacialLandmarkPicker:
         )
         
         # Add key press callbacks
-        self.plotter.add_key_event('r', make_landmark_callback('right_eye'))
-        self.plotter.add_key_event('l', make_landmark_callback('left_eye'))
-        self.plotter.add_key_event('n', make_landmark_callback('nose_tip'))
-        self.plotter.add_key_event('c', make_landmark_callback('chin'))
-        self.plotter.add_key_event('e', make_landmark_callback('right_ear'))
-        self.plotter.add_key_event('a', make_landmark_callback('left_ear'))
-        self.plotter.add_key_event('o', make_landmark_callback('other'))
+        self.plotter.add_key_event('1', make_landmark_callback('right_eye'))
+        self.plotter.add_key_event('2', make_landmark_callback('left_eye'))
+        self.plotter.add_key_event('3', make_landmark_callback('nose_tip'))
+        self.plotter.add_key_event('4', make_landmark_callback('chin'))
+        self.plotter.add_key_event('5', make_landmark_callback('right_ear'))
+        self.plotter.add_key_event('6', make_landmark_callback('left_ear'))
+        self.plotter.add_key_event('0', make_landmark_callback('other'))
         self.plotter.add_key_event('u', undo_callback)
         self.plotter.add_key_event('s', save_callback)
         self.plotter.add_key_event('q', quit_callback)

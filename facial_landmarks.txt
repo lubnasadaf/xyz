@@ -1,0 +1,27 @@
+right_eye (center):
+  Point 1: [376.91, 97.84, 146.96]
+
+left_eye (center):
+  Point 1: [376.84, 97.25, 213.39]
+
+nose_tip:
+  Point 1: [330.25, 52.24, 170.25]
+
+chin (center):
+  Point 1: [226.89, 71.91, 178.41]
+
+right_ear (top to bottom):
+  Point 1: [374.47, 201.74, 94.72]
+  Point 2: [331.24, 217.29, 96.60]
+  Point 3: [278.03, 200.02, 94.20]
+
+left_ear (top to bottom):
+  Point 1: [367.78, 199.41, 268.72]
+  Point 2: [318.08, 216.06, 266.35]
+  Point 3: [278.09, 196.05, 265.34]
+
+right_shoulder (highest point):
+  Point 1: [161.72, 165.92, 15.02]
+
+left_shoulder (highest point):
+  Point 1: [163.73, 182.75, 340.53]
