@@ -1,6 +1,6 @@
 """
-FINAL PRODUCTION: DICOM Face Overlay
-Correct transformation: Rotate Y -90° with Z offset -80
+ADJUSTABLE DICOM Face Overlay
+Fine-tune position and size with keyboard controls
 """
 
 import cv2
@@ -14,16 +14,16 @@ import os
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 
-class FinalDICOMFaceOverlay:
+class AdjustableDICOMOverlay:
     def __init__(self, dicom_folder, landmarks_3d):
         self.dicom_folder = dicom_folder
         self.landmarks_3d_original = landmarks_3d
         
-        # Final tuned parameters
-        self.offset_x = 0.0
-        self.offset_y = 0.0
-        self.offset_z = -80.0  # Adjusted for proper depth alignment
-        self.scale = 1.0
+        # Adjustment parameters - YOU CAN TUNE THESE
+        self.offset_x = 0.0  # Left/right adjustment
+        self.offset_y = 0.0  # Up/down adjustment
+        self.offset_z = 0.0  # Forward/back adjustment
+        self.scale = 1.0     # Size adjustment
         
         # Initialize MediaPipe
         print("Initializing MediaPipe...")
@@ -53,7 +53,6 @@ class FinalDICOMFaceOverlay:
         
         # Calculate mesh center
         self.mesh_center = self.mesh_3d_original.points.mean(axis=0)
-        print(f"Mesh center: [{self.mesh_center[0]:.1f}, {self.mesh_center[1]:.1f}, {self.mesh_center[2]:.1f}]")
         
         # Store ORIGINAL landmarks for PnP
         self.model_points_for_pnp = np.array([
@@ -65,13 +64,29 @@ class FinalDICOMFaceOverlay:
             self.landmarks_3d_original['left_ear'][1],
         ], dtype=np.float32)
         
-        print("\n✓ DICOM Face Overlay initialized successfully!")
-        print(f"  Transformation: Rotate Y -90° + Z offset {self.offset_z}")
-        print("  Overlay correctly positioned on face\n")
-        print("Press 'q' to quit\n")
+        self.print_controls()
+    
+    def print_controls(self):
+        print("\n" + "="*70)
+        print("ADJUSTABLE DICOM FACE OVERLAY")
+        print("="*70)
+        print("KEYBOARD CONTROLS:")
+        print("  LEFT/RIGHT ARROWS  - Move overlay left/right")
+        print("  UP/DOWN ARROWS     - Move overlay up/down")
+        print("  W/S                - Move overlay forward/back")
+        print("  +/=                - Make overlay bigger")
+        print("  -/_                - Make overlay smaller")
+        print("  R                  - Reset all adjustments")
+        print("  Q                  - Quit")
+        print("="*70)
+        print("Current adjustments:")
+        print(f"  X offset: {self.offset_x:+.1f}")
+        print(f"  Y offset: {self.offset_y:+.1f}")
+        print(f"  Z offset: {self.offset_z:+.1f}")
+        print(f"  Scale: {self.scale:.2f}")
+        print("="*70 + "\n")
     
     def load_dicom_volume(self):
-        """Load DICOM volume"""
         dicom_files = sorted(glob.glob(f"{self.dicom_folder}/*.dcm"))
         if not dicom_files:
             raise ValueError(f"No DICOM files found in {self.dicom_folder}")
@@ -89,12 +104,11 @@ class FinalDICOMFaceOverlay:
             float(first_slice.PixelSpacing[1])
         ]
         
-        print(f"  Loaded {len(dicom_files)} slices")
+        print(f"Loaded {len(dicom_files)} slices")
         return volume, spacing
     
     def create_optimized_mesh(self):
-        """Create 3D mesh from DICOM volume"""
-        print("Creating 3D mesh...")
+        print("Creating mesh...")
         
         z_dim, y_dim, x_dim = self.volume.shape
         grid = pv.ImageData()
@@ -104,7 +118,6 @@ class FinalDICOMFaceOverlay:
         volume_xyz = np.transpose(self.volume, (2, 1, 0))
         grid.point_data["values"] = volume_xyz.flatten(order="F")
         
-        # Create contour at 70th percentile
         threshold = np.percentile(self.volume, 70)
         mesh = grid.contour([threshold], scalars="values")
         
@@ -112,23 +125,22 @@ class FinalDICOMFaceOverlay:
             threshold = np.percentile(self.volume, 60)
             mesh = grid.contour([threshold], scalars="values")
         
-        # Decimate for performance
         mesh = mesh.decimate(0.95)
-        print(f"  Created mesh with {mesh.n_points} points")
+        print(f"Mesh: {mesh.n_points} points")
         
         return mesh
     
     def transform_mesh_points(self, points_3d):
         """
-        Apply the correct transformation:
+        Apply transformation with adjustments:
         1. Rotate Y -90°
-        2. Apply Z offset of -80
-        All transformations centered around mesh center
+        2. Apply offset
+        3. Apply scale
         """
-        # Step 1: Center the points
+        # Center the points
         centered = points_3d - self.mesh_center
         
-        # Step 2: Apply rotation around Y axis (-90 degrees)
+        # Apply rotation around Y axis (-90 degrees)
         angle = np.radians(-90)
         Ry = np.array([
             [np.cos(angle), 0, np.sin(angle)],
@@ -137,20 +149,19 @@ class FinalDICOMFaceOverlay:
         ])
         rotated = (Ry @ centered.T).T
         
-        # Step 3: Apply scale
+        # Apply scale
         scaled = rotated * self.scale
         
-        # Step 4: Apply offset (especially Z offset for depth positioning)
+        # Apply offset
         offset_vector = np.array([self.offset_x, self.offset_y, self.offset_z])
         adjusted = scaled + offset_vector
         
-        # Step 5: Translate back
+        # Translate back
         final_points = adjusted + self.mesh_center
         
         return final_points
     
     def get_2d_landmarks(self, face_landmarks, w, h):
-        """Extract 2D landmarks from MediaPipe detection"""
         image_points = []
         for key in ['right_eye', 'left_eye', 'nose_tip', 'chin', 'right_ear', 'left_ear']:
             idx = self.mp_landmarks[key]
@@ -161,7 +172,6 @@ class FinalDICOMFaceOverlay:
         return np.array(image_points, dtype=np.float32)
     
     def process_frame(self, frame):
-        """Process a single frame and overlay the DICOM mesh"""
         h, w, _ = frame.shape
         
         import mediapipe as mp
@@ -172,7 +182,6 @@ class FinalDICOMFaceOverlay:
             face_landmarks = detection_result.face_landmarks[0]
             image_points = self.get_2d_landmarks(face_landmarks, w, h)
             
-            # Camera parameters
             focal_length = w
             camera_matrix = np.array([
                 [focal_length, 0, w/2],
@@ -182,7 +191,6 @@ class FinalDICOMFaceOverlay:
             dist_coeffs = np.zeros((4, 1))
             
             try:
-                # Solve PnP using original landmarks
                 success, rvec, tvec = cv2.solvePnP(
                     self.model_points_for_pnp,
                     image_points,
@@ -192,81 +200,113 @@ class FinalDICOMFaceOverlay:
                 )
                 
                 if success:
-                    # Get original mesh points
+                    # Transform mesh with adjustments
                     original_mesh_points = self.mesh_3d_original.points
-                    
-                    # Apply the correct transformation with offset
                     transformed_mesh_points = self.transform_mesh_points(original_mesh_points)
                     
-                    # Project transformed mesh to 2D
+                    # Project to 2D
                     points_2d, _ = cv2.projectPoints(
                         transformed_mesh_points, rvec, tvec, camera_matrix, dist_coeffs
                     )
                     points_2d = points_2d.reshape(-1, 2)
                     
-                    # Draw mesh overlay
-                    # Adjust the step size here to change density:
-                    # - range(0, len(points_2d), 2) = more dense
-                    # - range(0, len(points_2d), 5) = less dense
+                    # Draw mesh
                     for i in range(0, len(points_2d), 3):
                         x, y = int(points_2d[i][0]), int(points_2d[i][1])
                         if 0 <= x < w and 0 <= y < h:
-                            # Change color here: (B, G, R)
-                            # (0, 255, 255) = cyan
-                            # (0, 255, 0) = green
-                            # (255, 0, 0) = blue
                             cv2.circle(frame, (x, y), 2, (0, 255, 255), -1)
                     
-                    # Optional: Draw face landmarks for debugging
-                    # Uncomment to show green dots on face landmarks:
-                    # for point in image_points:
-                    #     cv2.circle(frame, tuple(point.astype(int)), 5, (0, 255, 0), -1)
+                    # Draw face landmarks for reference
+                    for point in image_points:
+                        cv2.circle(frame, tuple(point.astype(int)), 4, (0, 255, 0), -1)
                     
             except Exception as e:
-                # Silently handle errors
                 pass
         
-        # Simple status display
-        cv2.putText(frame, "DICOM Face Overlay", (10, 30),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+        # Display controls and current values
+        cv2.putText(frame, "DICOM Face Overlay - Adjustable", 
+                   (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+        cv2.putText(frame, f"X:{self.offset_x:+.0f} Y:{self.offset_y:+.0f} Z:{self.offset_z:+.0f} Scale:{self.scale:.2f}", 
+                   (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+        cv2.putText(frame, "Arrows: Move | W/S: Depth | +/-: Size | R: Reset", 
+                   (10, h-15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
         
         return frame
     
     def run(self):
-        """Run the face overlay application"""
         cap = cv2.VideoCapture(0)
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
         
-        print("Starting webcam...\n")
+        print("Starting webcam...")
+        print("Use arrow keys to adjust position!\n")
+        
+        step_xy = 5.0  # pixels for X/Y adjustment
+        step_z = 5.0   # units for Z adjustment
+        step_scale = 0.05  # scale increment
         
         while cap.isOpened():
             ret, frame = cap.read()
             if not ret:
                 break
             
-            # Process frame
             rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             processed_frame = self.process_frame(rgb_frame)
             bgr_frame = cv2.cvtColor(processed_frame, cv2.COLOR_RGB2BGR)
             
-            # Display
-            cv2.imshow('DICOM Face Overlay - Press q to quit', bgr_frame)
+            cv2.imshow('Adjustable DICOM Overlay - Use arrow keys', bgr_frame)
             
-            # Check for quit
-            if cv2.waitKey(1) & 0xFF == ord('q'):
+            key = cv2.waitKey(1) & 0xFF
+            
+            if key == ord('q'):
                 break
+            elif key == 81 or key == 2:  # Left arrow
+                self.offset_x -= step_xy
+                print(f"X offset: {self.offset_x:+.1f}")
+            elif key == 83 or key == 3:  # Right arrow
+                self.offset_x += step_xy
+                print(f"X offset: {self.offset_x:+.1f}")
+            elif key == 82 or key == 0:  # Up arrow
+                self.offset_y -= step_xy
+                print(f"Y offset: {self.offset_y:+.1f}")
+            elif key == 84 or key == 1:  # Down arrow
+                self.offset_y += step_xy
+                print(f"Y offset: {self.offset_y:+.1f}")
+            elif key == ord('w'):  # Forward
+                self.offset_z -= step_z
+                print(f"Z offset: {self.offset_z:+.1f}")
+            elif key == ord('s'):  # Backward
+                self.offset_z += step_z
+                print(f"Z offset: {self.offset_z:+.1f}")
+            elif key == ord('+') or key == ord('='):  # Bigger
+                self.scale += step_scale
+                print(f"Scale: {self.scale:.2f}")
+            elif key == ord('-') or key == ord('_'):  # Smaller
+                self.scale = max(0.1, self.scale - step_scale)
+                print(f"Scale: {self.scale:.2f}")
+            elif key == ord('r'):  # Reset
+                self.offset_x = 0.0
+                self.offset_y = 0.0
+                self.offset_z = 0.0
+                self.scale = 1.0
+                print("Reset all adjustments")
         
-        print("\nClosing application...\n")
+        print("\n" + "="*70)
+        print("FINAL ADJUSTMENTS:")
+        print("="*70)
+        print(f"offset_x = {self.offset_x}")
+        print(f"offset_y = {self.offset_y}")
+        print(f"offset_z = {self.offset_z}")
+        print(f"scale = {self.scale}")
+        print("\nCopy these values into your production script!")
+        print("="*70)
+        
         cap.release()
         cv2.destroyAllWindows()
         self.face_landmarker.close()
 
 
 def main():
-    """Main entry point"""
-    
-    # Your 3D landmarks from DICOM
     landmarks_3d = {
         'right_eye': [np.array([376.91, 97.84, 146.96])],
         'left_eye': [np.array([376.84, 97.25, 213.39])],
@@ -284,11 +324,10 @@ def main():
         ],
     }
     
-    # Path to DICOM files
     dicom_folder = r"dicom_files"
     
     try:
-        overlay = FinalDICOMFaceOverlay(dicom_folder, landmarks_3d)
+        overlay = AdjustableDICOMOverlay(dicom_folder, landmarks_3d)
         overlay.run()
     except Exception as e:
         print(f"\nError: {e}")
